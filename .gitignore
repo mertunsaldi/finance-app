@@ -211,6 +211,7 @@ __marimo__/
 .venv/
 
 # Streamlit
+.streamlit
 .streamlit/secrets.toml
 
 # MacOS/Windows Sistem Dosyaları
@@ -224,3 +225,4 @@ data/*.db
 # Sadece klasör yapısını korumak için boş bir .keep dosyasına izin ver
 !data/.keep
 
+*.json
