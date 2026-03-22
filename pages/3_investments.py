@@ -72,26 +72,31 @@ with st.expander("➕ Yeni Alım / Satım İşlemi Ekle", expanded=False):
             quantity = st.number_input("Adet / Gram", min_value=0.00001, step=1.0, format="%.5f")
 
         with col4:
-            price = st.number_input("Birim Maliyet (TL)", min_value=0.0, step=10.0, format="%.2f")
+            cost_method = st.selectbox("Fiyat Girişi", ["Birim Maliyet", "Toplam Maliyet"])
+            cost_input = st.number_input(f"{cost_method} (TL)", min_value=0.0, step=10.0, format="%.2f")
 
         submitted = st.form_submit_button("İşlemi Kaydet")
 
         if submitted:
-            if asset_display and quantity > 0 and price > 0:
+            if asset_display and quantity > 0 and cost_input > 0:
+
+                # Seçilen yönteme göre birim maliyeti hesapla
+                price = cost_input if cost_method == "Birim Maliyet" else (cost_input / quantity)
+
                 ticker = ""
                 asset_name = ""
 
                 if category == "Altın / Gümüş":
                     asset_name = asset_display
-                    if asset_display == "Fiziki Gram Altın (Kapalıçarşı)":
+                    if asset_display == "Fiziki Gram Altın":
                         ticker = "API_GRAM_FIZIKI"
-                    elif asset_display == "Banka Gram Altın (Sanal)":
+                    elif asset_display == "Sanal Gram Altın":
                         ticker = "API_GRAM_BANKA"
-                    elif asset_display == "Fiziki 22 Ayar Bilezik":
+                    elif asset_display == "Fiziki 22 Ayar Altın":
                         ticker = "API_22_FIZIKI"
-                    elif asset_display == "Fiziki Gümüş (Kapalıçarşı)":
+                    elif asset_display == "Fiziki Gümüş":
                         ticker = "API_GUMUS_FIZIKI"
-                    elif asset_display == "Banka Gümüş (Sanal)":
+                    elif asset_display == "Sanal Gümüş":
                         ticker = "API_GUMUS_BANKA"
                 elif category == "Yatırım Fonu (TEFAS)":
                     asset_display = asset_display.strip()
@@ -125,7 +130,7 @@ with st.expander("➕ Yeni Alım / Satım İşlemi Ekle", expanded=False):
                 st.success(f"{asset_name} için {t_type} işlemi başarıyla kaydedildi!")
                 st.rerun()
             else:
-                st.error("Lütfen varlık adını, adedi ve birim maliyeti kontrol edin.")
+                st.error("Lütfen varlık adını, adedi ve tutarı kontrol edin.")
 
 st.divider()
 
