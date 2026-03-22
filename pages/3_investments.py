@@ -130,9 +130,8 @@ with st.expander("➕ Yeni Alım / Satım İşlemi Ekle", expanded=False):
             save_data(f"investments_{current_user}", transactions)
             st.success(f"{asset_name} için {t_type} işlemi başarıyla kaydedildi!")
 
-            # Form silinme mekanizmasını (clear_on_submit) manuel olarak simüle et
-            for key in ["qty_input", "cost_input", "fon_input", "bist_input", "yabanci_input", "kripto_input",
-                        "cost_method"]:
+            # Form silinme mekanizmasını simüle et (cost_method silinmiyor, kullanıcının seçimi sabit kalıyor)
+            for key in ["qty_input", "cost_input", "fon_input", "bist_input", "yabanci_input", "kripto_input"]:
                 if key in st.session_state:
                     del st.session_state[key]
 
@@ -410,10 +409,12 @@ if active_assets:
     total_investment = sum(item["total_cost"] for item in portfolio.values())
     total_current_value = sum(item["Toplam Değer"] for item in active_assets)
     total_pl = total_current_value - total_investment
+    total_pl_pct = (total_pl / total_investment) * 100 if total_investment > 0 else 0
 
     col_p1, col_p2, col_p3 = st.columns(3)
     col_p1.metric("Toplam Yatırım Maliyeti", f"{total_investment:,.2f} TL")
-    col_p2.metric("Anlık Portföy Büyüklüğü (Bozdurma)", f"{total_current_value:,.2f} TL", delta=f"{total_pl:,.2f} TL")
+    col_p2.metric("Anlık Portföy Büyüklüğü (Bozdurma)", f"{total_current_value:,.2f} TL",
+                  delta=f"{total_pl:,.2f} TL ({total_pl_pct:,.2f}%)")
 
 else:
     st.info("Şu an elinizde aktif bir varlık bulunmuyor. Yeni alım girdiğinizde burada listelenecektir.")
