@@ -205,3 +205,22 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Python / Çevre
+*.py[cod]
+.venv/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# MacOS/Windows Sistem Dosyaları
+.DS_Store
+Thumbs.db
+
+# Kişisel Finans Verileri (Burası Çok Önemli)
+data/*.csv
+data/*.json
+data/*.db
+# Sadece klasör yapısını korumak için boş bir .keep dosyasına izin ver
+!data/.keep
+
