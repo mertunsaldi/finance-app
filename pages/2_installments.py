@@ -83,66 +83,72 @@ with st.expander("➕ Yeni Taksit Ekle", expanded=False):
     if not saved_cards:
         st.warning("⚠️ Taksit ekleyebilmek için lütfen önce yukarıdaki panelden en az bir tane Banka/Kart ekleyin.")
     else:
-        with st.form("add_installment_form", clear_on_submit=True):
-            col1, col2 = st.columns(2)
+        # Anlık güncellemelerin çalışması için st.form yapısı buradan kaldırıldı.
+        col1, col2 = st.columns(2)
 
-            with col1:
-                item_name = st.text_input("Ürün/Açıklama (Örn: Cep Telefonu, Beyaz Eşya vb.)")
-                card_names_for_select = [c.get("bank_name", "") for c in saved_cards]
-                bank_name = st.selectbox("Banka/Kart Seçin", card_names_for_select)
-                monthly_payment = st.number_input("Aylık Taksit Tutarı (TL)", min_value=0.0, step=100.0)
+        with col1:
+            item_name = st.text_input("Ürün/Açıklama (Örn: Cep Telefonu, Beyaz Eşya vb.)", key="inst_item")
+            card_names_for_select = [c.get("bank_name", "") for c in saved_cards]
+            bank_name = st.selectbox("Banka/Kart Seçin", card_names_for_select, key="inst_bank")
+            monthly_payment = st.number_input("Aylık Taksit Tutarı (TL)", min_value=0.0, step=100.0, key="inst_payment")
 
-            with col2:
-                remaining_months = st.number_input("Kalan Taksit Sayısı", min_value=1, step=1)
+        with col2:
+            remaining_months = st.number_input("Kalan Taksit Sayısı", min_value=1, step=1, key="inst_months")
 
-                # Seçilen karta göre otomatik ödeme tarihi hesaplama algoritması
-                first_payment_date = datetime.now()
-                if bank_name:
-                    selected_card = next((c for c in saved_cards if c.get("bank_name") == bank_name), None)
-                    p_day = int(selected_card.get("payment_day", 1)) if selected_card else 1
+            # Seçilen karta göre otomatik ödeme tarihi hesaplama algoritması (Artık anında güncellenir)
+            first_payment_date = datetime.now()
+            if bank_name:
+                selected_card = next((c for c in saved_cards if c.get("bank_name") == bank_name), None)
+                p_day = int(selected_card.get("payment_day", 1)) if selected_card else 1
 
-                    now = datetime.now()
-                    t_month = now.month
-                    t_year = now.year
+                now = datetime.now()
+                t_month = now.month
+                t_year = now.year
 
-                    # Eğer bugünün tarihi ödeme gününü geçmişse, ödeme bir sonraki aya sarkar
-                    if now.day > p_day:
-                        t_month += 1
-                        if t_month > 12:
-                            t_month = 1
-                            t_year += 1
+                # Eğer bugünün tarihi ödeme gününü geçmişse, ödeme bir sonraki aya sarkar
+                if now.day > p_day:
+                    t_month += 1
+                    if t_month > 12:
+                        t_month = 1
+                        t_year += 1
 
-                    # Şubat ayı gibi ayın 30'u veya 31'i olmayan durumlar için limit belirle
-                    max_days_in_month = calendar.monthrange(t_year, t_month)[1]
-                    actual_day = min(p_day, max_days_in_month)
+                # Şubat ayı gibi ayın 30'u veya 31'i olmayan durumlar için limit belirle
+                max_days_in_month = calendar.monthrange(t_year, t_month)[1]
+                actual_day = min(p_day, max_days_in_month)
 
-                    first_payment_date = datetime(t_year, t_month, actual_day)
+                first_payment_date = datetime(t_year, t_month, actual_day)
 
-                    st.info(
-                        f"📅 Otomatik İlk Ödeme Tarihi: **{first_payment_date.strftime('%d.%m.%Y')}**\n\n*(Kartın ödeme günü her ayın {p_day}. günü olarak tanımlı)*")
+                st.info(
+                    f"📅 Otomatik İlk Ödeme Tarihi: **{first_payment_date.strftime('%d.%m.%Y')}**\n\n*(Kartın ödeme günü her ayın {p_day}. günü olarak tanımlı)*")
 
-            submitted = st.form_submit_button("Taksiti Kaydet")
+        submitted = st.button("Taksiti Kaydet", type="primary")
 
-            if submitted:
-                if item_name and monthly_payment > 0 and bank_name:
-                    # Her kayda benzersiz bir ID veriyoruz (silme işlemi için gerekli)
-                    new_item = {
-                        "id": str(uuid.uuid4())[:8],
-                        "item": item_name,
-                        "bank": bank_name,
-                        "monthly_payment": monthly_payment,
-                        "remaining_months": remaining_months,
-                        "first_payment_date": first_payment_date.strftime("%Y-%m-%d"),
-                        "total_remaining": monthly_payment * remaining_months
-                    }
-                    if not installments:
-                        installments = []
-                    installments.append(new_item)
-                    save_data(f"installments_{current_user}", installments)
-                    st.success(f"{item_name} başarıyla eklendi!")
-                    st.rerun()
-                else:
-                    st.error("Lütfen ürün adını ve aylık tutarı geçerli giriniz.")
+        if submitted:
+            if item_name and monthly_payment > 0 and bank_name:
+                # Her kayda benzersiz bir ID veriyoruz (silme işlemi için gerekli)
+                new_item = {
+                    "id": str(uuid.uuid4())[:8],
+                    "item": item_name,
+                    "bank": bank_name,
+                    "monthly_payment": monthly_payment,
+                    "remaining_months": remaining_months,
+                    "first_payment_date": first_payment_date.strftime("%Y-%m-%d"),
+                    "total_remaining": monthly_payment * remaining_months
+                }
+                if not installments:
+                    installments = []
+                installments.append(new_item)
+                save_data(f"installments_{current_user}", installments)
+                st.success(f"{item_name} başarıyla eklendi!")
+
+                # Form silme mekanizmasını (clear_on_submit) manuel simüle etme
+                for key in ["inst_item", "inst_payment", "inst_months"]:
+                    if key in st.session_state:
+                        del st.session_state[key]
+
+                st.rerun()
+            else:
+                st.error("Lütfen ürün adını ve aylık tutarı geçerli giriniz.")
 
 st.divider()
 
