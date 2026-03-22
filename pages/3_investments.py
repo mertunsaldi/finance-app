@@ -44,93 +44,99 @@ with st.expander("➕ Yeni Alım / Satım İşlemi Ekle", expanded=False):
         "Kripto Para"
     ])
 
-    with st.form("add_investment_form", clear_on_submit=True):
-        col1, col2, col3, col4 = st.columns(4)
+    # st.form bloğu kaldırıldı. Artık seçimler arayüzü anında güncelleyecek!
+    col1, col2, col3, col4 = st.columns(4)
 
-        with col1:
-            t_type = st.selectbox("İşlem Tipi", ["Alım", "Satım"])
+    with col1:
+        t_type = st.selectbox("İşlem Tipi", ["Alım", "Satım"])
 
-        with col2:
+    with col2:
+        if category == "Altın / Gümüş":
+            asset_display = st.selectbox("Varlık Seçin", [
+                "Fiziki Gram Altın",
+                "Sanal Gram Altın",
+                "Fiziki 22 Ayar Altın",
+                "Fiziki Gümüş",
+                "Sanal Gümüş"
+            ])
+        elif category == "Yatırım Fonu (TEFAS)":
+            asset_display = st.text_input("Fon Kodu (Örn: MAC, TI3)", key="fon_input").upper()
+        elif category == "BIST Hisse (Yerli)":
+            asset_display = st.text_input("Hisse Kodu (Örn: THYAO)", key="bist_input").upper()
+        elif category == "Yabancı Hisse":
+            asset_display = st.text_input("Hisse Kodu (Örn: AAPL)", key="yabanci_input").upper()
+        else:
+            asset_display = st.text_input("Kripto Kodu (Örn: BTC)", key="kripto_input").upper()
+
+    with col3:
+        quantity = st.number_input("Adet / Gram", min_value=0.00001, step=1.0, format="%.5f", key="qty_input")
+
+    with col4:
+        cost_method = st.selectbox("Fiyat Girişi", ["Birim Maliyet", "Toplam Maliyet"])
+        cost_input = st.number_input(f"{cost_method} (TL)", min_value=0.0, step=10.0, format="%.2f", key="cost_input")
+
+    submitted = st.button("İşlemi Kaydet", type="primary")
+
+    if submitted:
+        if asset_display and quantity > 0 and cost_input > 0:
+
+            # Seçilen yönteme göre birim maliyeti hesapla
+            price = cost_input if cost_method == "Birim Maliyet" else (cost_input / quantity)
+
+            ticker = ""
+            asset_name = ""
+
             if category == "Altın / Gümüş":
-                asset_display = st.selectbox("Varlık Seçin", [
-                    "Fiziki Gram Altın",
-                    "Sanal Gram Altın",
-                    "Fiziki 22 Ayar Altın",
-                    "Fiziki Gümüş",
-                    "Sanal Gümüş"
-                ])
+                asset_name = asset_display
+                if asset_display == "Fiziki Gram Altın":
+                    ticker = "API_GRAM_FIZIKI"
+                elif asset_display == "Sanal Gram Altın":
+                    ticker = "API_GRAM_BANKA"
+                elif asset_display == "Fiziki 22 Ayar Altın":
+                    ticker = "API_22_FIZIKI"
+                elif asset_display == "Fiziki Gümüş":
+                    ticker = "API_GUMUS_FIZIKI"
+                elif asset_display == "Sanal Gümüş":
+                    ticker = "API_GUMUS_BANKA"
             elif category == "Yatırım Fonu (TEFAS)":
-                asset_display = st.text_input("Fon Kodu (Örn: MAC, TI3)").upper()
+                asset_display = asset_display.strip()
+                asset_name = f"{asset_display} Fonu"
+                ticker = f"{asset_display}_FON"
             elif category == "BIST Hisse (Yerli)":
-                asset_display = st.text_input("Hisse Kodu (Örn: THYAO)").upper()
+                asset_display = asset_display.strip()
+                asset_name = asset_display
+                ticker = f"{asset_display}.IS"
             elif category == "Yabancı Hisse":
-                asset_display = st.text_input("Hisse Kodu (Örn: AAPL)").upper()
-            else:
-                asset_display = st.text_input("Kripto Kodu (Örn: BTC)").upper()
+                asset_display = asset_display.strip()
+                asset_name = asset_display
+                ticker = asset_display
+            elif category == "Kripto Para":
+                asset_display = asset_display.strip()
+                asset_name = asset_display
+                ticker = f"{asset_display}-USD"
 
-        with col3:
-            quantity = st.number_input("Adet / Gram", min_value=0.00001, step=1.0, format="%.5f")
+            new_tx = {
+                "id": str(uuid.uuid4())[:8],
+                "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "type": t_type,
+                "asset": ticker,
+                "asset_name": asset_name,
+                "quantity": quantity,
+                "price": price,
+                "total": quantity * price
+            }
+            transactions.append(new_tx)
+            save_data(f"investments_{current_user}", transactions)
+            st.success(f"{asset_name} için {t_type} işlemi başarıyla kaydedildi!")
 
-        with col4:
-            cost_method = st.selectbox("Fiyat Girişi", ["Birim Maliyet", "Toplam Maliyet"])
-            cost_input = st.number_input(f"{cost_method} (TL)", min_value=0.0, step=10.0, format="%.2f")
+            # Form silinme mekanizmasını (clear_on_submit) manuel olarak simüle et
+            for key in ["qty_input", "cost_input", "fon_input", "bist_input", "yabanci_input", "kripto_input"]:
+                if key in st.session_state:
+                    del st.session_state[key]
 
-        submitted = st.form_submit_button("İşlemi Kaydet")
-
-        if submitted:
-            if asset_display and quantity > 0 and cost_input > 0:
-
-                # Seçilen yönteme göre birim maliyeti hesapla
-                price = cost_input if cost_method == "Birim Maliyet" else (cost_input / quantity)
-
-                ticker = ""
-                asset_name = ""
-
-                if category == "Altın / Gümüş":
-                    asset_name = asset_display
-                    if asset_display == "Fiziki Gram Altın":
-                        ticker = "API_GRAM_FIZIKI"
-                    elif asset_display == "Sanal Gram Altın":
-                        ticker = "API_GRAM_BANKA"
-                    elif asset_display == "Fiziki 22 Ayar Altın":
-                        ticker = "API_22_FIZIKI"
-                    elif asset_display == "Fiziki Gümüş":
-                        ticker = "API_GUMUS_FIZIKI"
-                    elif asset_display == "Sanal Gümüş":
-                        ticker = "API_GUMUS_BANKA"
-                elif category == "Yatırım Fonu (TEFAS)":
-                    asset_display = asset_display.strip()
-                    asset_name = f"{asset_display} Fonu"
-                    ticker = f"{asset_display}_FON"
-                elif category == "BIST Hisse (Yerli)":
-                    asset_display = asset_display.strip()
-                    asset_name = asset_display
-                    ticker = f"{asset_display}.IS"
-                elif category == "Yabancı Hisse":
-                    asset_display = asset_display.strip()
-                    asset_name = asset_display
-                    ticker = asset_display
-                elif category == "Kripto Para":
-                    asset_display = asset_display.strip()
-                    asset_name = asset_display
-                    ticker = f"{asset_display}-USD"
-
-                new_tx = {
-                    "id": str(uuid.uuid4())[:8],
-                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                    "type": t_type,
-                    "asset": ticker,
-                    "asset_name": asset_name,
-                    "quantity": quantity,
-                    "price": price,
-                    "total": quantity * price
-                }
-                transactions.append(new_tx)
-                save_data(f"investments_{current_user}", transactions)
-                st.success(f"{asset_name} için {t_type} işlemi başarıyla kaydedildi!")
-                st.rerun()
-            else:
-                st.error("Lütfen varlık adını, adedi ve tutarı kontrol edin.")
+            st.rerun()
+        else:
+            st.error("Lütfen varlık adını, adedi ve tutarı kontrol edin.")
 
 st.divider()
 
@@ -206,15 +212,21 @@ def get_gold_silver_price(ticker):
         try:
             usd_try = get_usd_try()
             if "GRAM" in ticker:
-                gold_oz = float(yf.Ticker("XAUUSD=X").history(period="1d")['Close'].iloc[-1])
+                try:
+                    gold_oz = float(yf.Ticker("XAUUSD=X").history(period="1d")['Close'].iloc[-1])
+                except:
+                    gold_oz = float(yf.Ticker("GC=F").history(period="1d")['Close'].iloc[-1])
                 price = (gold_oz / 31.103) * usd_try
                 return price, price
             elif "GUMUS" in ticker:
-                silver_oz = float(yf.Ticker("XAGUSD=X").history(period="1d")['Close'].iloc[-1])
+                try:
+                    silver_oz = float(yf.Ticker("XAGUSD=X").history(period="1d")['Close'].iloc[-1])
+                except:
+                    silver_oz = float(yf.Ticker("SI=F").history(period="1d")['Close'].iloc[-1])
                 price = (silver_oz / 31.103) * usd_try
                 return price, price
         except:
-            return 0.0, 0.0
+            pass  # HATA VERME, 0 DÖNME. YFinance çökerse CanlıDöviz'deki fiziki fiyata (fallback) geçiş yapacak!
 
     # 2. Fiziki Altın ve Gümüş (Kapalıçarşı)
     try:
