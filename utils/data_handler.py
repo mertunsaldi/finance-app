@@ -2,7 +2,7 @@ import streamlit as st
 import gspread
 
 # Senin oluşturduğun E-Tablo'nun BİREBİR adı
-SHEET_NAME = "FinansDB"
+SHEET_NAME = "finance-db"
 
 
 @st.cache_resource
