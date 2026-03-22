@@ -37,7 +37,7 @@ transactions = load_data(f"investments_{current_user}")
 # --- 1. AKILLI YENİ İŞLEM EKLEME FORMU ---
 with st.expander("➕ Yeni Alım / Satım İşlemi Ekle", expanded=False):
     category = st.selectbox("Yatırım Kategorisi", [
-        "Altın / Gümüş (Fiziki & Banka)",
+        "Altın / Gümüş",
         "Yatırım Fonu (TEFAS)",
         "BIST Hisse (Yerli)",
         "Yabancı Hisse",
@@ -51,8 +51,14 @@ with st.expander("➕ Yeni Alım / Satım İşlemi Ekle", expanded=False):
             t_type = st.selectbox("İşlem Tipi", ["Alım", "Satım"])
 
         with col2:
-            if category == "Altın / Gümüş (Fiziki & Banka)":
-                asset_display = st.selectbox("Varlık Seçin", ["Gram Altın", "22 Ayar Altın", "Gümüş"])
+            if category == "Altın / Gümüş":
+                asset_display = st.selectbox("Varlık Seçin", [
+                    "Fiziki Gram Altın",
+                    "Sanal Gram Altın",
+                    "Fiziki 22 Ayar Altın",
+                    "Fiziki Gümüş",
+                    "Sanal Gümüş"
+                ])
             elif category == "Yatırım Fonu (TEFAS)":
                 asset_display = st.text_input("Fon Kodu (Örn: MAC, TI3)").upper()
             elif category == "BIST Hisse (Yerli)":
@@ -75,14 +81,18 @@ with st.expander("➕ Yeni Alım / Satım İşlemi Ekle", expanded=False):
                 ticker = ""
                 asset_name = ""
 
-                if category == "Altın / Gümüş (Fiziki & Banka)":
+                if category == "Altın / Gümüş":
                     asset_name = asset_display
-                    if asset_display == "Gram Altın":
-                        ticker = "API_GRAM"
-                    elif asset_display == "22 Ayar Altın":
-                        ticker = "API_22"
-                    else:
-                        ticker = "API_GUMUS"
+                    if asset_display == "Fiziki Gram Altın (Kapalıçarşı)":
+                        ticker = "API_GRAM_FIZIKI"
+                    elif asset_display == "Banka Gram Altın (Sanal)":
+                        ticker = "API_GRAM_BANKA"
+                    elif asset_display == "Fiziki 22 Ayar Bilezik":
+                        ticker = "API_22_FIZIKI"
+                    elif asset_display == "Fiziki Gümüş (Kapalıçarşı)":
+                        ticker = "API_GUMUS_FIZIKI"
+                    elif asset_display == "Banka Gümüş (Sanal)":
+                        ticker = "API_GUMUS_BANKA"
                 elif category == "Yatırım Fonu (TEFAS)":
                     asset_display = asset_display.strip()
                     asset_name = f"{asset_display} Fonu"
@@ -185,7 +195,23 @@ def clean_and_parse_price(text):
 
 @st.cache_data(ttl=300)
 def get_gold_silver_price(ticker):
-    """Canlı Döviz (Kapalıçarşı) üzerinden güncel ALIŞ ve SATIŞ fiyatlarını çeker."""
+    """Canlı Döviz (Kapalıçarşı) üzerinden fiziki, YFinance üzerinden sanal (banka) fiyatlarını çeker."""
+    # 1. Sanal/Banka Altın ve Gümüş (Spot Küresel Fiyat)
+    if "BANKA" in ticker:
+        try:
+            usd_try = get_usd_try()
+            if "GRAM" in ticker:
+                gold_oz = float(yf.Ticker("XAUUSD=X").history(period="1d")['Close'].iloc[-1])
+                price = (gold_oz / 31.103) * usd_try
+                return price, price
+            elif "GUMUS" in ticker:
+                silver_oz = float(yf.Ticker("XAGUSD=X").history(period="1d")['Close'].iloc[-1])
+                price = (silver_oz / 31.103) * usd_try
+                return price, price
+        except:
+            return 0.0, 0.0
+
+    # 2. Fiziki Altın ve Gümüş (Kapalıçarşı)
     try:
         url = "https://canlidoviz.com/altin-fiyatlari/kapali-carsi"
         headers = {
@@ -200,11 +226,11 @@ def get_gold_silver_price(ticker):
             soup = BeautifulSoup(response.content, "html.parser")
 
             search_text = ""
-            if ticker in ["API_GRAM", "HAREM_GRAM", "GRAM_ALTIN"]:
+            if "GRAM" in ticker:
                 search_text = "GRAM ALTIN"
-            elif ticker in ["API_22", "HAREM_22"]:
+            elif "22" in ticker:
                 search_text = "22 AYAR BİLEZİK"
-            elif ticker in ["API_GUMUS", "HAREM_GUMUS", "GRAM_GUMUS"]:
+            elif "GUMUS" in ticker:
                 search_text = "GÜMÜŞ"
 
             for tr in soup.find_all('tr'):
@@ -234,15 +260,15 @@ def get_gold_silver_price(ticker):
     # Yfinance Yedek Planı (API Çökerse Ons üzerinden hesaplar, alış-satış tek fiyat döner)
     try:
         usd_try = get_usd_try()
-        if ticker in ["API_GRAM", "HAREM_GRAM", "GRAM_ALTIN"]:
+        if "GRAM" in ticker:
             gold_oz = float(yf.Ticker("XAUUSD=X").history(period="1d")['Close'].iloc[-1])
             price = (gold_oz / 31.103) * usd_try
             return price, price
-        elif ticker in ["API_22", "HAREM_22"]:
+        elif "22" in ticker:
             gold_oz = float(yf.Ticker("XAUUSD=X").history(period="1d")['Close'].iloc[-1])
             price = ((gold_oz / 31.103) * usd_try) * 0.916
             return price, price
-        elif ticker in ["API_GUMUS", "HAREM_GUMUS", "GRAM_GUMUS"]:
+        elif "GUMUS" in ticker:
             silver_oz = float(yf.Ticker("XAGUSD=X").history(period="1d")['Close'].iloc[-1])
             price = (silver_oz / 31.103) * usd_try
             return price, price
@@ -259,12 +285,8 @@ def get_current_price(ticker):
         fon_kodu = ticker.replace("_FON", "")
         return get_tefas_price(fon_kodu)
 
-    if ticker in ["API_GRAM", "HAREM_GRAM", "GRAM_ALTIN"]:
-        return get_gold_silver_price("API_GRAM")
-    elif ticker in ["API_22", "HAREM_22"]:
-        return get_gold_silver_price("API_22")
-    elif ticker in ["API_GUMUS", "HAREM_GUMUS", "GRAM_GUMUS"]:
-        return get_gold_silver_price("API_GUMUS")
+    if ticker.startswith("API_") or ticker in ["HAREM_GRAM", "GRAM_ALTIN", "HAREM_22", "HAREM_GUMUS", "GRAM_GUMUS"]:
+        return get_gold_silver_price(ticker)
 
     try:
         stock = yf.Ticker(ticker)
