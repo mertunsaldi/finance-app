@@ -72,7 +72,8 @@ with st.expander("➕ Yeni Alım / Satım İşlemi Ekle", expanded=False):
         quantity = st.number_input("Adet / Gram", min_value=0.00001, step=1.0, format="%.5f", key="qty_input")
 
     with col4:
-        cost_method = st.selectbox("Fiyat Girişi", ["Birim Maliyet", "Toplam Maliyet"])
+        # State karışıklığını önlemek için cost_method'a key atandı
+        cost_method = st.selectbox("Fiyat Girişi", ["Birim Maliyet", "Toplam Maliyet"], key="cost_method")
         cost_input = st.number_input(f"{cost_method} (TL)", min_value=0.0, step=10.0, format="%.2f", key="cost_input")
 
     submitted = st.button("İşlemi Kaydet", type="primary")
@@ -130,7 +131,8 @@ with st.expander("➕ Yeni Alım / Satım İşlemi Ekle", expanded=False):
             st.success(f"{asset_name} için {t_type} işlemi başarıyla kaydedildi!")
 
             # Form silinme mekanizmasını (clear_on_submit) manuel olarak simüle et
-            for key in ["qty_input", "cost_input", "fon_input", "bist_input", "yabanci_input", "kripto_input"]:
+            for key in ["qty_input", "cost_input", "fon_input", "bist_input", "yabanci_input", "kripto_input",
+                        "cost_method"]:
                 if key in st.session_state:
                     del st.session_state[key]
 
@@ -145,7 +147,8 @@ st.divider()
 @st.cache_data(ttl=300)
 def get_usd_try():
     try:
-        return float(yf.Ticker("TRY=X").history(period="1d")['Close'].iloc[-1])
+        # Hafta sonu boş veri gelmesine karşı period="5d" ve dropna() kullanıyoruz
+        return float(yf.Ticker("TRY=X").history(period="5d")['Close'].dropna().iloc[-1])
     except:
         return 32.0
 
@@ -213,16 +216,17 @@ def get_gold_silver_price(ticker):
             usd_try = get_usd_try()
             if "GRAM" in ticker:
                 try:
-                    gold_oz = float(yf.Ticker("XAUUSD=X").history(period="1d")['Close'].iloc[-1])
+                    # Yfinance hata vermemesi için period genişletildi ve boş günler filtrelendi
+                    gold_oz = float(yf.Ticker("XAUUSD=X").history(period="5d")['Close'].dropna().iloc[-1])
                 except:
-                    gold_oz = float(yf.Ticker("GC=F").history(period="1d")['Close'].iloc[-1])
+                    gold_oz = float(yf.Ticker("GC=F").history(period="5d")['Close'].dropna().iloc[-1])
                 price = (gold_oz / 31.103) * usd_try
                 return price, price
             elif "GUMUS" in ticker:
                 try:
-                    silver_oz = float(yf.Ticker("XAGUSD=X").history(period="1d")['Close'].iloc[-1])
+                    silver_oz = float(yf.Ticker("XAGUSD=X").history(period="5d")['Close'].dropna().iloc[-1])
                 except:
-                    silver_oz = float(yf.Ticker("SI=F").history(period="1d")['Close'].iloc[-1])
+                    silver_oz = float(yf.Ticker("SI=F").history(period="5d")['Close'].dropna().iloc[-1])
                 price = (silver_oz / 31.103) * usd_try
                 return price, price
         except:
@@ -278,15 +282,15 @@ def get_gold_silver_price(ticker):
     try:
         usd_try = get_usd_try()
         if "GRAM" in ticker:
-            gold_oz = float(yf.Ticker("XAUUSD=X").history(period="1d")['Close'].iloc[-1])
+            gold_oz = float(yf.Ticker("XAUUSD=X").history(period="5d")['Close'].dropna().iloc[-1])
             price = (gold_oz / 31.103) * usd_try
             return price, price
         elif "22" in ticker:
-            gold_oz = float(yf.Ticker("XAUUSD=X").history(period="1d")['Close'].iloc[-1])
+            gold_oz = float(yf.Ticker("XAUUSD=X").history(period="5d")['Close'].dropna().iloc[-1])
             price = ((gold_oz / 31.103) * usd_try) * 0.916
             return price, price
         elif "GUMUS" in ticker:
-            silver_oz = float(yf.Ticker("XAGUSD=X").history(period="1d")['Close'].iloc[-1])
+            silver_oz = float(yf.Ticker("XAGUSD=X").history(period="5d")['Close'].dropna().iloc[-1])
             price = (silver_oz / 31.103) * usd_try
             return price, price
     except:
@@ -307,9 +311,9 @@ def get_current_price(ticker):
 
     try:
         stock = yf.Ticker(ticker)
-        hist = stock.history(period="1d")
+        hist = stock.history(period="5d")  # Boş günleri atlamak için genişletildi
         if not hist.empty:
-            price = float(hist['Close'].iloc[-1])
+            price = float(hist['Close'].dropna().iloc[-1])
             if ticker.endswith("-USD") or not ticker.endswith(".IS"):
                 price = price * get_usd_try()
             return price, price  # Hisse/Kriptoda şimdilik alış/satış ortaktır
