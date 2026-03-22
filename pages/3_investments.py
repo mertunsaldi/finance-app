@@ -214,18 +214,11 @@ def get_gold_silver_price(ticker):
         try:
             usd_try = get_usd_try()
             if "GRAM" in ticker:
-                try:
-                    # Yfinance hata vermemesi için period genişletildi ve boş günler filtrelendi
-                    gold_oz = float(yf.Ticker("XAUUSD=X").history(period="5d")['Close'].dropna().iloc[-1])
-                except:
-                    gold_oz = float(yf.Ticker("GC=F").history(period="5d")['Close'].dropna().iloc[-1])
+                gold_oz = float(yf.Ticker("GC=F").history(period="5d")['Close'].dropna().iloc[-1])
                 price = (gold_oz / 31.103) * usd_try
                 return price, price
             elif "GUMUS" in ticker:
-                try:
-                    silver_oz = float(yf.Ticker("XAGUSD=X").history(period="5d")['Close'].dropna().iloc[-1])
-                except:
-                    silver_oz = float(yf.Ticker("SI=F").history(period="5d")['Close'].dropna().iloc[-1])
+                silver_oz = float(yf.Ticker("SI=F").history(period="5d")['Close'].dropna().iloc[-1])
                 price = (silver_oz / 31.103) * usd_try
                 return price, price
         except:
@@ -281,15 +274,15 @@ def get_gold_silver_price(ticker):
     try:
         usd_try = get_usd_try()
         if "GRAM" in ticker:
-            gold_oz = float(yf.Ticker("XAUUSD=X").history(period="5d")['Close'].dropna().iloc[-1])
+            gold_oz = float(yf.Ticker("GC=F").history(period="5d")['Close'].dropna().iloc[-1])
             price = (gold_oz / 31.103) * usd_try
             return price, price
         elif "22" in ticker:
-            gold_oz = float(yf.Ticker("XAUUSD=X").history(period="5d")['Close'].dropna().iloc[-1])
+            gold_oz = float(yf.Ticker("GC=F").history(period="5d")['Close'].dropna().iloc[-1])
             price = ((gold_oz / 31.103) * usd_try) * 0.916
             return price, price
         elif "GUMUS" in ticker:
-            silver_oz = float(yf.Ticker("XAGUSD=X").history(period="5d")['Close'].dropna().iloc[-1])
+            silver_oz = float(yf.Ticker("SI=F").history(period="5d")['Close'].dropna().iloc[-1])
             price = (silver_oz / 31.103) * usd_try
             return price, price
     except:
