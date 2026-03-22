@@ -1,9 +1,5 @@
 import streamlit as st
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-
-# Google Drive ve Sheets yetkilendirme linkleri
-SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
 # Senin oluşturduğun E-Tablo'nun BİREBİR adı
 SHEET_NAME = "FinansDB"
@@ -11,12 +7,13 @@ SHEET_NAME = "FinansDB"
 
 @st.cache_resource
 def get_gspread_client():
-    """Streamlit Secrets üzerinden Google'a bağlanır."""
+    """Streamlit Secrets üzerinden Google'a modern yöntemle bağlanır."""
     try:
-        # st.secrets'tan bilgileri çekip dict'e çeviriyoruz
+        # st.secrets'tan bilgileri çekip standart bir Python sözlüğüne (dict) çeviriyoruz
         creds_dict = dict(st.secrets["gcp_service_account"])
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
-        client = gspread.authorize(creds)
+
+        # gspread'in kendi dahili kimlik doğrulamasını kullanıyoruz (oauth2client kütüphanesine gerek yok)
+        client = gspread.service_account_from_dict(creds_dict)
         return client
     except Exception as e:
         st.error(f"Google bağlantı hatası: Lütfen .streamlit/secrets.toml ayarlarınızı kontrol edin. Detay: {e}")
@@ -72,9 +69,10 @@ def save_data(filename, data):
         # 1. Durum: Bu bir Banka Listesi ise (Sadece string listesi)
         if filename.startswith("banks_"):
             rows = [["Bankalar"]] + [[str(item)] for item in data]
-            ws.update(range_name="A1", values=rows)
+            # Güncel gspread sürümüne (v6+) uygun veri yazma formatı
+            ws.update(values=rows, range_name="A1")
 
-        # 2. Durum: Bu bir Yatırım/Taksit listesi ise (Sözlük listesi)
+        # 2. Durum: Bu bir Yatırım/Taksit/Kullanıcı listesi ise (Sözlük listesi)
         else:
             if isinstance(data, list) and isinstance(data[0], dict):
                 headers = list(data[0].keys())
@@ -85,7 +83,8 @@ def save_data(filename, data):
                     row = [str(item.get(h, "")) for h in headers]
                     rows.append(row)
 
-                ws.update(range_name="A1", values=rows)
+                # Güncel gspread sürümüne (v6+) uygun veri yazma formatı
+                ws.update(values=rows, range_name="A1")
 
     except Exception as e:
         st.error(f"Google E-Tablolara kaydedilirken hata oluştu: {e}")
