@@ -282,7 +282,7 @@ st.markdown(
     "Sanal altın/gümüş: <a href='https://www.yapikredi.com.tr/yatirimci-kosesi/doviz-bilgileri' style='color:inherit'>Yapı Kredi</a> · "
     "Fiziki altın/gümüş: <a href='https://canlidoviz.com/altin-fiyatlari/kapali-carsi' style='color:inherit'>CanlıDöviz</a> · "
     "BIST & kripto & döviz: <a href='https://finance.yahoo.com' style='color:inherit'>Yahoo Finance</a> · "
-    "Yatırım fonları: <a href='https://www.tefas.gov.tr' style='color:inherit'>TEFAS</a>"
+    "Yatırım fonları: <a href='https://fundturkey.com.tr' style='color:inherit'>TEFAS</a>"
     "</div>",
     unsafe_allow_html=True
 )

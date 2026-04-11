@@ -3,6 +3,7 @@
 import re
 import requests
 import urllib3
+from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 import yfinance as yf
 import streamlit as st
@@ -19,35 +20,65 @@ def get_usd_try():
         return 32.0
 
 
+_TEFAS_HEADERS = {
+    "Connection": "keep-alive",
+    "X-Requested-With": "XMLHttpRequest",
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+    "Accept": "application/json, text/javascript, */*; q=0.01",
+    "Origin": "https://fundturkey.com.tr",
+    "Referer": "https://fundturkey.com.tr/TarihselVeriler.aspx",
+}
+
+
+def _tefas_latest_date():
+    """Son veri bulunan iş gününü DD.MM.YYYY formatında döndürür."""
+    d = datetime.now()
+    # Hafta sonunu atla
+    if d.weekday() >= 5:
+        d -= timedelta(days=(d.weekday() - 4))
+    # Bugün henüz veri yoksa bir önceki iş gününe düş
+    for _ in range(3):
+        date_str = d.strftime("%d.%m.%Y")
+        try:
+            r = requests.post(
+                "https://fundturkey.com.tr/api/DB/BindHistoryInfo",
+                headers=_TEFAS_HEADERS, timeout=10, verify=False,
+                data={"fontip": "YAT", "bastarih": date_str, "bittarih": date_str, "fonkod": "MAC"},
+            )
+            if r.json().get("data"):
+                return date_str
+        except Exception:
+            pass
+        d -= timedelta(days=1)
+        if d.weekday() >= 5:
+            d -= timedelta(days=(d.weekday() - 4))
+    return d.strftime("%d.%m.%Y")
+
+
+@st.cache_data(ttl=300)
+def _get_tefas_date():
+    """Cache'li son TEFAS veri tarihi."""
+    return _tefas_latest_date()
+
+
 @st.cache_data(ttl=300)
 def get_tefas_price(fon_kodu):
+    """Tek bir fonun fiyatını fundturkey.com.tr API'sinden çeker (~0.1 sn)."""
+    date_str = _get_tefas_date()
     try:
-        url = f"https://www.tefas.gov.tr/FonAnaliz.aspx?FonKod={fon_kodu}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-            "Connection": "keep-alive"
-        }
-        session = requests.Session()
-        response = session.get(url, headers=headers, timeout=10, verify=False)
-
-        if response.status_code != 200:
-            return -1.0, -1.0
-
-        soup = BeautifulSoup(response.content, "html.parser")
-        page_title = soup.title.text if soup.title else ""
-        if "Just a moment" in page_title or "Attention Required" in page_title:
-            return -1.0, -1.0
-
-        top_list = soup.find("ul", class_="top-list")
-        if top_list:
-            price_str = top_list.find_all("li")[0].find("span").text.strip()
-            price_float = float(price_str.replace('.', '').replace(',', '.'))
-            return price_float, price_float
-        return -1.0, -1.0
+        r = requests.post(
+            "https://fundturkey.com.tr/api/DB/BindHistoryInfo",
+            headers=_TEFAS_HEADERS, timeout=10, verify=False,
+            data={"fontip": "YAT", "bastarih": date_str, "bittarih": date_str, "fonkod": fon_kodu},
+        )
+        records = r.json().get("data", [])
+        if records:
+            price = records[0]["FIYAT"]
+            return price, price
     except Exception:
-        return -1.0, -1.0
+        pass
+    return -1.0, -1.0
 
 
 def clean_and_parse_price(text):
@@ -184,14 +215,15 @@ def get_current_price(ticker):
 def fetch_all_prices(tickers):
     """Birden fazla ticker için fiyatları paralel çeker.
 
-    Args:
-        tickers: list of ticker strings
-
     Returns: dict {ticker: (alis, satis)}
     """
+    if not tickers:
+        return {}
+    # TEFAS fonları için önce tarihi cache'le (tek hafif istek), sonra hepsi paralel
+    if any(t.endswith("_FON") for t in tickers):
+        _get_tefas_date()
     with ThreadPoolExecutor(max_workers=len(tickers)) as executor:
-        results = dict(zip(tickers, executor.map(get_current_price, tickers)))
-    return results
+        return dict(zip(tickers, executor.map(get_current_price, tickers)))
 
 
 def build_portfolio(transactions):
