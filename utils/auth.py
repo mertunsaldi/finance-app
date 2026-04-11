@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1
 import hashlib
 import sys
 import os
@@ -12,23 +13,17 @@ def hash_password(password):
 
 
 def _set_cookie(name, value, max_age=30 * 24 * 60 * 60):
-    """Tarayıcıya cookie yazar (JS ile, bileşen gerektirmez)."""
+    """Tarayıcıya cookie yazar (parent frame üzerinden, st.context.cookies ile uyumlu)."""
     import re
     safe_value = re.sub(r'[^a-zA-Z0-9_\-.]', '', str(value))
-    st.html(f"""
-        <script>
-        document.cookie = "{name}={safe_value}; path=/; max-age={max_age}; SameSite=Lax";
-        </script>
-    """)
+    js = f"parent.document.cookie = '{name}={safe_value}; path=/; max-age={max_age}; SameSite=Lax';"
+    st.components.v1.html(f"<script>{js}</script>", height=0)
 
 
 def _delete_cookie(name):
     """Tarayıcıdan cookie siler."""
-    st.html(f"""
-        <script>
-        document.cookie = "{name}=; path=/; max-age=0; SameSite=Lax";
-        </script>
-    """)
+    js = f"parent.document.cookie = '{name}=; path=/; max-age=0; SameSite=Lax';"
+    st.components.v1.html(f"<script>{js}</script>", height=0)
 
 
 def check_login():
@@ -37,6 +32,9 @@ def check_login():
     # 1) Session'da zaten login varsa — anında geç
     current_user = st.session_state.get("logged_in_user")
     if current_user:
+        # Cookie henüz yazılmamışsa yaz (login sonrası ilk renderda)
+        if st.context.cookies.get("current_user") != current_user:
+            _set_cookie("current_user", current_user)
         return current_user
 
     # 2) Cookie'den oku (st.context.cookies — yerleşik, JS bileşeni yok, anında)
@@ -72,8 +70,6 @@ def check_login():
 
                 if user_found:
                     st.session_state["logged_in_user"] = login_username
-                    _set_cookie("current_user", login_username)
-                    st.success("Giriş başarılı!")
                     st.rerun()
                 else:
                     st.error("Hatalı kullanıcı adı veya şifre!")
