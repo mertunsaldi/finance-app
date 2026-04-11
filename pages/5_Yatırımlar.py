@@ -14,6 +14,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from utils.data_handler import load_data, save_data
 from utils.finance import calc_first_payment_date, clear_form_keys
 
+from utils.auth import check_login
+check_login()
 current_user = st.session_state["logged_in_user"]
 
 st.title(":material/trending_up: Yatırım ve Portföy Yönetimi")

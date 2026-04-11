@@ -4,6 +4,8 @@ import uuid
 from utils.data_handler import load_data, save_data
 from utils.finance import DAY_TYPE_OPTIONS, clear_form_keys, format_day_type
 
+from utils.auth import check_login
+check_login()
 current_user = st.session_state["logged_in_user"]
 
 st.title(":material/receipt_long: Düzenli Gider Yönetimi")

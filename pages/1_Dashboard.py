@@ -11,6 +11,8 @@ from utils.finance import (
     MONTH_NAMES_SHORT, MONTH_NAMES_FULL
 )
 
+from utils.auth import check_login
+check_login()
 current_user = st.session_state["logged_in_user"]
 
 st.title(":material/monitoring: Finansal Kontrol Paneli")

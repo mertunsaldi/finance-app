@@ -6,6 +6,8 @@ import uuid
 from utils.data_handler import load_data, save_data
 from utils.finance import FREQUENCY_OPTIONS, DAY_TYPE_OPTIONS, MONTH_NAMES_FULL, clear_form_keys, format_day_type
 
+from utils.auth import check_login
+check_login()
 current_user = st.session_state["logged_in_user"]
 
 st.title(":material/attach_money: Gelir Yönetimi")
