@@ -23,12 +23,25 @@ def check_login(cookie_manager=None):
     if current_user:
         return current_user
 
-    # 2) Cookie'den oku — st.context.cookies HTTP header'dan okur,
-    #    ilk renderda anında gelir, CookieManager beklemeye gerek yok.
-    cookie_user = st.context.cookies.get("current_user")
-    if cookie_user:
-        st.session_state["logged_in_user"] = cookie_user
-        return cookie_user
+    # 2) CookieManager'dan oku
+    if cookie_manager is not None:
+        cookies = cookie_manager.get_all()
+        cookie_user = cookies.get("current_user") if cookies else None
+
+        if cookie_user:
+            st.session_state["logged_in_user"] = cookie_user
+            return cookie_user
+
+        # CookieManager ilk renderda boş döner (JS bileşeni henüz tarayıcıdan
+        # cookie'leri okuyamadı). Login formu GÖSTERMEDEN sessizce bekle.
+        # Bileşen hazır olunca otomatik rerun tetikler.
+        retries = st.session_state.get("_cookie_retries", 0)
+        if retries < 2:
+            st.session_state["_cookie_retries"] = retries + 1
+            st.stop()
+
+        # Retries bitti — cookie yok, gerçekten giriş yapılmamış
+        st.session_state.pop("_cookie_retries", None)
 
     # 3) cookie_manager yoksa (sayfa doğrudan çalıştı) — login'e yönlendir
     if cookie_manager is None:
