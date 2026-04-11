@@ -3,21 +3,12 @@ import pandas as pd
 from datetime import datetime
 import calendar
 import uuid
-import sys
-import os
-
-# utils klasöründeki modülleri çağırabilmek için dosya yolunu ayarlıyoruz
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils.data_handler import load_data, save_data
-from utils.auth import check_login
+from utils.finance import calc_first_payment_date, clear_form_keys
 
-# Sayfa ayarları
-st.set_page_config(page_title="Taksit Takibi", page_icon="💳", layout="wide")
+current_user = st.session_state["logged_in_user"]
 
-# Giriş kontrolü
-current_user = check_login()
-
-st.title("💳 Taksit ve Borç Yönetimi")
+st.title(":material/credit_card: Taksit ve Borç Yönetimi")
 st.markdown("Kredi kartı taksitlerinizi buradan ekleyebilir, aktif borç yükünüzü takip edebilirsiniz.")
 
 # Kullanıcıya özel verileri yükle
@@ -37,12 +28,12 @@ if not saved_cards:
         saved_cards = []
 
 # --- 1. BÖLÜM: BANKA VE KART YÖNETİM PANELİ ---
-st.markdown("### 🏦 Banka ve Kart Yönetimi")
+st.markdown("### :material/account_balance: Banka ve Kart Yönetimi")
 with st.expander("Banka/Kart Ekle veya Sil", expanded=False):
     col_add, col_del = st.columns(2)
 
     with col_add:
-        st.markdown("**➕ Yeni Banka/Kart Ekle**")
+        st.markdown("**:material/add: Yeni Banka/Kart Ekle**")
         with st.form("add_bank_form", clear_on_submit=True):
             new_bank_name = st.text_input("Banka veya Kart Adı (Örn: Garanti Miles&Smiles)")
             payment_day = st.number_input("Her Ayın Ödeme Günü", min_value=1, max_value=31, step=1, value=15)
@@ -61,7 +52,7 @@ with st.expander("Banka/Kart Ekle veya Sil", expanded=False):
                     st.error("Lütfen geçerli bir isim girin.")
 
     with col_del:
-        st.markdown("**🗑️ Kayıtlı Bankayı/Kartı Sil**")
+        st.markdown("**:material/delete: Kayıtlı Bankayı/Kartı Sil**")
         if saved_cards:
             with st.form("delete_bank_form"):
                 card_names = [c.get("bank_name", "") for c in saved_cards]
@@ -79,9 +70,9 @@ with st.expander("Banka/Kart Ekle veya Sil", expanded=False):
 st.divider()
 
 # --- 2. BÖLÜM: YENİ TAKSİT EKLEME FORMU ---
-with st.expander("➕ Yeni Taksit Ekle", expanded=False):
+with st.expander(":material/add: Yeni Taksit Ekle", expanded=False):
     if not saved_cards:
-        st.warning("⚠️ Taksit ekleyebilmek için lütfen önce yukarıdaki panelden en az bir tane Banka/Kart ekleyin.")
+        st.warning("Taksit ekleyebilmek için lütfen önce yukarıdaki panelden en az bir tane Banka/Kart ekleyin.")
     else:
         # Anlık güncellemelerin çalışması için st.form yapısı buradan kaldırıldı.
         col1, col2 = st.columns(2)
@@ -94,32 +85,18 @@ with st.expander("➕ Yeni Taksit Ekle", expanded=False):
 
         with col2:
             remaining_months = st.number_input("Kalan Taksit Sayısı", min_value=1, step=1, key="inst_months")
+            purchase_date = st.date_input("Satın Alma Tarihi", value=datetime.now().date(), key="inst_purchase_date")
 
-            # Seçilen karta göre otomatik ödeme tarihi hesaplama algoritması (Artık anında güncellenir)
+            # Seçilen karta ve satın alma tarihine göre ilk ödeme tarihi hesaplama
             first_payment_date = datetime.now()
             if bank_name:
                 selected_card = next((c for c in saved_cards if c.get("bank_name") == bank_name), None)
-                p_day = int(selected_card.get("payment_day", 1)) if selected_card else 1
+                p_day = selected_card.get("payment_day", 1) if selected_card else 1
 
-                now = datetime.now()
-                t_month = now.month
-                t_year = now.year
-
-                # Eğer bugünün tarihi ödeme gününü geçmişse, ödeme bir sonraki aya sarkar
-                if now.day > p_day:
-                    t_month += 1
-                    if t_month > 12:
-                        t_month = 1
-                        t_year += 1
-
-                # Şubat ayı gibi ayın 30'u veya 31'i olmayan durumlar için limit belirle
-                max_days_in_month = calendar.monthrange(t_year, t_month)[1]
-                actual_day = min(p_day, max_days_in_month)
-
-                first_payment_date = datetime(t_year, t_month, actual_day)
+                first_payment_date = calc_first_payment_date(purchase_date, p_day)
 
                 st.info(
-                    f"📅 Otomatik İlk Ödeme Tarihi: **{first_payment_date.strftime('%d.%m.%Y')}**\n\n*(Kartın ödeme günü her ayın {p_day}. günü olarak tanımlı)*")
+                    f"İlk Ödeme Tarihi: **{first_payment_date.strftime('%d.%m.%Y')}**\n\n*(Kartın ödeme günü her ayın {p_day}. günü olarak tanımlı)*")
 
         submitted = st.button("Taksiti Kaydet", type="primary")
 
@@ -153,7 +130,7 @@ with st.expander("➕ Yeni Taksit Ekle", expanded=False):
 st.divider()
 
 # --- 3. BÖLÜM: AKTİF TAKSİTLERİ LİSTELEME ---
-st.markdown("### 📋 Aktif Taksit Listesi")
+st.markdown("### :material/list_alt: Aktif Taksit Listesi")
 
 if installments:
     df = pd.DataFrame(installments)
@@ -180,14 +157,14 @@ if installments:
     total_monthly = sum(float(item["monthly_payment"]) for item in installments)
     total_debt = sum(float(item["total_remaining"]) for item in installments)
 
-    col_sum1, col_sum2, col_sum3 = st.columns(3)
+    col_sum1, col_sum2 = st.columns(2)
     col_sum1.metric("Toplam Aylık Yük", f"{total_monthly:,.2f} TL")
     col_sum2.metric("Toplam Kalan Borç", f"{total_debt:,.2f} TL")
 
     st.divider()
 
     # --- 4. BÖLÜM: SİLME İŞLEMİ ---
-    st.markdown("### 🗑️ Taksit Kapat / Sil")
+    st.markdown("### :material/delete: Taksit Kapat / Sil")
     col_del1, col_del2 = st.columns([3, 1])
 
     with col_del1:
