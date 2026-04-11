@@ -154,13 +154,17 @@ for i in range(6):
 
 fig_bar = go.Figure()
 fig_bar.add_trace(go.Bar(name="Net Harcanabilir", x=labels, y=net_values,
-                         marker_color="#2ca02c", hovertext=net_hovers, hoverinfo="text"))
+                         marker_color="#2ca02c", hovertext=net_hovers, hoverinfo="text",
+                         offsetgroup=0))
 fig_bar.add_trace(go.Bar(name="Sabit Giderler", x=labels, y=exp_values,
-                         marker_color="#f97316", hovertext=exp_hovers, hoverinfo="text"))
+                         marker_color="#f97316", hovertext=exp_hovers, hoverinfo="text",
+                         offsetgroup=0))
 fig_bar.add_trace(go.Bar(name="Taksit Yükü", x=labels, y=inst_values,
-                         marker_color="#d62728", hovertext=inst_hovers, hoverinfo="text"))
+                         marker_color="#d62728", hovertext=inst_hovers, hoverinfo="text",
+                         offsetgroup=0))
 fig_bar.add_trace(go.Bar(name="Yatırım Gideri", x=labels, y=inv_values,
-                         marker_color="#3b82f6", hovertext=inv_hovers, hoverinfo="text"))
+                         marker_color="#3b82f6", hovertext=inv_hovers, hoverinfo="text",
+                         offsetgroup=0))
 
 fig_bar.update_layout(
     barmode="stack", title="Gelecek Aylardaki Bütçe Durumu",
