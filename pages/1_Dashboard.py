@@ -191,7 +191,7 @@ days_in_month = calendar.monthrange(sel_year, sel_month)[1]
 
 
 # Her gün için olayları topla
-daily_events = {d: {"gelir": [], "gider": []} for d in range(1, days_in_month + 1)}
+daily_events = {d: {"gelir": [], "gider": [], "taksit": [], "yatirim": []} for d in range(1, days_in_month + 1)}
 
 # Düzenli gelirler
 for inc in regular_incomes:
@@ -217,7 +217,7 @@ for exp in expenses:
 for inst in installments:
     if is_installment_active(inst, sel_year, sel_month):
         p_day = min(datetime.strptime(inst["first_payment_date"], "%Y-%m-%d").day, days_in_month)
-        daily_events[p_day]["gider"].append({"name": f"{inst['item']} ({inst['bank']})", "amount": inst["monthly_payment"]})
+        daily_events[p_day]["taksit"].append({"name": f"{inst['item']} ({inst['bank']})", "amount": inst["monthly_payment"]})
 
 # Tek seferlik yatırım alımları
 for t in investments:
@@ -231,53 +231,81 @@ for t in investments:
         continue
     if tx_date.year == sel_year and tx_date.month == sel_month:
         amt = float(t["total"])
-        daily_events[tx_date.day]["gider"].append({
-            "name": f"Yatırım: {t.get('asset_name', t['asset'])}",
+        daily_events[tx_date.day]["yatirim"].append({
+            "name": t.get('asset_name', t['asset']),
             "amount": amt
         })
 
 # Sadece olay olan günleri göster
 event_days = [d for d in range(1, days_in_month + 1)
-              if daily_events[d]["gelir"] or daily_events[d]["gider"]]
+              if daily_events[d]["gelir"] or daily_events[d]["gider"]
+              or daily_events[d]["taksit"] or daily_events[d]["yatirim"]]
 
 if event_days:
     day_labels = []
-    gelir_vals = []
-    gider_vals = []
-    gelir_hover_texts = []
-    gider_hover_texts = []
+    gelir_vals, gelir_hovers = [], []
+    gider_vals, gider_hovers = [], []
+    taksit_vals, taksit_hovers = [], []
+    yatirim_vals, yatirim_hovers = [], []
 
     for d in event_days:
         ev = daily_events[d]
+        day_label = f"{d} {MONTH_NAMES_FULL[sel_month-1]}"
+        day_labels.append(day_label)
+
         g_total = sum(item["amount"] for item in ev["gelir"])
-        c_total = sum(item["amount"] for item in ev["gider"])
-
-        day_labels.append(f"{d} {MONTH_NAMES_FULL[sel_month-1]}")
         gelir_vals.append(g_total)
-        gider_vals.append(-c_total)
-
         if ev["gelir"]:
             lines = [f"  {item['name']}: +{item['amount']:,.0f} TL" for item in ev["gelir"]]
-            gelir_hover_texts.append(f"<b>{d} {MONTH_NAMES_FULL[sel_month-1]} — Gelir: +{g_total:,.0f} TL</b><br>" + "<br>".join(lines))
+            gelir_hovers.append(f"<b>{day_label} — Gelir: +{g_total:,.0f} TL</b><br>" + "<br>".join(lines))
         else:
-            gelir_hover_texts.append("")
+            gelir_hovers.append("")
 
+        e_total = sum(item["amount"] for item in ev["gider"])
+        gider_vals.append(-e_total)
         if ev["gider"]:
             lines = [f"  {item['name']}: -{item['amount']:,.0f} TL" for item in ev["gider"]]
-            gider_hover_texts.append(f"<b>{d} {MONTH_NAMES_FULL[sel_month-1]} — Gider: -{c_total:,.0f} TL</b><br>" + "<br>".join(lines))
+            gider_hovers.append(f"<b>{day_label} — Sabit Gider: -{e_total:,.0f} TL</b><br>" + "<br>".join(lines))
         else:
-            gider_hover_texts.append("")
+            gider_hovers.append("")
+
+        t_total = sum(item["amount"] for item in ev["taksit"])
+        taksit_vals.append(-t_total)
+        if ev["taksit"]:
+            lines = [f"  {item['name']}: -{item['amount']:,.0f} TL" for item in ev["taksit"]]
+            taksit_hovers.append(f"<b>{day_label} — Taksit: -{t_total:,.0f} TL</b><br>" + "<br>".join(lines))
+        else:
+            taksit_hovers.append("")
+
+        y_total = sum(item["amount"] for item in ev["yatirim"])
+        yatirim_vals.append(-y_total)
+        if ev["yatirim"]:
+            lines = [f"  {item['name']}: -{item['amount']:,.0f} TL" for item in ev["yatirim"]]
+            yatirim_hovers.append(f"<b>{day_label} — Yatırım: -{y_total:,.0f} TL</b><br>" + "<br>".join(lines))
+        else:
+            yatirim_hovers.append("")
 
     fig_daily = go.Figure()
 
     fig_daily.add_trace(go.Bar(
         name="Gelir", x=day_labels, y=gelir_vals,
-        marker_color="#2ca02c", hovertext=gelir_hover_texts, hoverinfo="text"
+        marker_color="#2ca02c", hovertext=gelir_hovers, hoverinfo="text",
+        offsetgroup=0
     ))
-
     fig_daily.add_trace(go.Bar(
-        name="Gider", x=day_labels, y=gider_vals,
-        marker_color="#d62728", hovertext=gider_hover_texts, hoverinfo="text"
+        name="Sabit Giderler", x=day_labels, y=gider_vals,
+        marker_color="#f97316", hovertext=gider_hovers, hoverinfo="text",
+        offsetgroup=0
+    ))
+    fig_daily.add_trace(go.Bar(
+        name="Taksit Yükü", x=day_labels, y=taksit_vals,
+        marker_color="#d62728", hovertext=taksit_hovers, hoverinfo="text",
+        offsetgroup=0
+    ))
+    fig_daily.add_trace(go.Bar(
+        name="Yatırım Gideri", x=day_labels, y=yatirim_vals,
+        marker_color="#3b82f6", hovertext=yatirim_hovers, hoverinfo="text",
+        offsetgroup=0
     ))
 
     fig_daily.update_layout(
