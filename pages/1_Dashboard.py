@@ -55,7 +55,7 @@ col2.metric("Bu Ayki Taksit Yükü", f"{current_month_load:,.0f} TL",
 col3, col4 = st.columns(2)
 col3.metric("Toplam Yatırım (Maliyet)", f"{total_portfolio_cost:,.0f} TL")
 col4.metric("Anlık Portföy Değeri", f"{total_current_value:,.0f} TL",
-            delta=f"{total_pl:,.0f} TL ({total_pl_pct:,.1f}%)",
+            delta=f"{total_pl:,.0f} TL ({total_pl_pct:,.3f}%)",
             delta_color="normal")
 
 st.divider()

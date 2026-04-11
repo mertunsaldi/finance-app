@@ -237,7 +237,7 @@ if active_assets:
     col_p1, col_p2 = st.columns(2)
     col_p1.metric("Toplam Yatırım Maliyeti", f"{total_investment:,.2f} TL")
     col_p2.metric("Anlık Portföy Büyüklüğü (Bozdurma)", f"{total_current_value:,.2f} TL",
-                  delta=f"{total_pl:,.2f} TL ({total_pl_pct:,.2f}%)")
+                  delta=f"{total_pl:,.2f} TL ({total_pl_pct:,.3f}%)")
 else:
     st.info("Şu an elinizde aktif bir varlık bulunmuyor. Yeni alım girdiğinizde burada listelenecektir.")
 
