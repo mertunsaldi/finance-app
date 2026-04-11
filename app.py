@@ -1,4 +1,5 @@
 import streamlit as st
+import extra_streamlit_components as stx
 import sys
 import os
 
@@ -8,11 +9,14 @@ from utils.data_handler import preload_data
 
 st.set_page_config(page_title="Finansal Dashboard", page_icon=":material/monitoring:", layout="wide")
 
-# Auth — tek sefer
-check_login()
-show_sidebar_user()
+# CookieManager — script run başına tek instance
+cookie_manager = stx.CookieManager(key="auth_cookie_manager")
 
-# Tüm kullanıcı verisini paralel preload (sayfa açılmadan önce)
+# Auth
+check_login(cookie_manager)
+show_sidebar_user(cookie_manager)
+
+# Tüm kullanıcı verisini paralel preload
 current_user = st.session_state["logged_in_user"]
 preload_data([
     f"installments_{current_user}",

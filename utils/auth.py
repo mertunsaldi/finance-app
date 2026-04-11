@@ -1,6 +1,6 @@
 import streamlit as st
-import streamlit.components.v1
 import hashlib
+import time
 import sys
 import os
 
@@ -12,38 +12,32 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 
-def _set_cookie(name, value, max_age=30 * 24 * 60 * 60):
-    """Tarayıcıya cookie yazar (parent frame üzerinden, st.context.cookies ile uyumlu)."""
-    import re
-    safe_value = re.sub(r'[^a-zA-Z0-9_\-.]', '', str(value))
-    js = f"parent.document.cookie = '{name}={safe_value}; path=/; max-age={max_age}; SameSite=Lax';"
-    st.components.v1.html(f"<script>{js}</script>", height=0)
-
-
-def _delete_cookie(name):
-    """Tarayıcıdan cookie siler."""
-    js = f"parent.document.cookie = '{name}=; path=/; max-age=0; SameSite=Lax';"
-    st.components.v1.html(f"<script>{js}</script>", height=0)
-
-
-def check_login():
-    """Kullanıcının giriş yapıp yapmadığını kontrol eder."""
+def check_login(cookie_manager=None):
+    """Kullanıcının giriş yapıp yapmadığını kontrol eder.
+    cookie_manager: app.py'den geçirilen CookieManager nesnesi.
+    Pages'dan çağrıldığında None olur — session state fast path'e düşer.
+    """
 
     # 1) Session'da zaten login varsa — anında geç
     current_user = st.session_state.get("logged_in_user")
     if current_user:
-        # Cookie henüz yazılmamışsa yaz (login sonrası ilk renderda)
-        if st.context.cookies.get("current_user") != current_user:
-            _set_cookie("current_user", current_user)
         return current_user
 
-    # 2) Cookie'den oku (st.context.cookies — yerleşik, JS bileşeni yok, anında)
-    cookie_user = st.context.cookies.get("current_user")
-    if cookie_user:
-        st.session_state["logged_in_user"] = cookie_user
-        return cookie_user
+    # 2) Cookie'den oku (CookieManager gerekli)
+    if cookie_manager is not None:
+        cookies = cookie_manager.get_all()
+        cookie_user = cookies.get("current_user") if cookies else None
 
-    # 3) Giriş yapılmamış — login formu göster
+        if cookie_user:
+            st.session_state["logged_in_user"] = cookie_user
+            return cookie_user
+
+    # 3) cookie_manager yoksa (sayfa doğrudan çalıştı) — login'e yönlendir
+    if cookie_manager is None:
+        st.warning("Oturum bulunamadı. Lütfen ana sayfadan giriş yapın.")
+        st.stop()
+
+    # 4) Giriş yapılmamış — login formu göster
     st.markdown("""
     <style>
         [data-testid="collapsedControl"] { display: none; }
@@ -70,6 +64,8 @@ def check_login():
 
                 if user_found:
                     st.session_state["logged_in_user"] = login_username
+                    cookie_manager.set("current_user", login_username, max_age=30 * 24 * 60 * 60)
+                    time.sleep(0.5)
                     st.rerun()
                 else:
                     st.error("Hatalı kullanıcı adı veya şifre!")
@@ -94,7 +90,7 @@ def check_login():
     st.stop()
 
 
-def show_sidebar_user():
+def show_sidebar_user(cookie_manager=None):
     """Sidebar'da aktif kullanıcı ve çıkış butonu gösterir."""
     current_user = st.session_state.get("logged_in_user")
     if not current_user:
@@ -102,10 +98,11 @@ def show_sidebar_user():
 
     st.sidebar.markdown(f":material/person: **{current_user}**")
     if st.sidebar.button(":material/logout: Çıkış Yap", key="logout_btn"):
-        # Kullanıcı veri cache'ini temizle
         keys_to_clear = [k for k in st.session_state if k.startswith("_data_")]
         for k in keys_to_clear:
             del st.session_state[k]
         st.session_state["logged_in_user"] = None
-        _delete_cookie("current_user")
+        if cookie_manager is not None:
+            cookie_manager.delete("current_user")
+            time.sleep(0.5)
         st.rerun()
