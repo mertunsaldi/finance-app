@@ -68,6 +68,8 @@ st.caption("Gelir - (Sabit Giderler + Taksitler + Tek Seferlik Yatırımlar). Ta
 labels = []
 net_values = []
 net_hovers = []
+exp_values = []
+exp_hovers = []
 inst_values = []
 inst_hovers = []
 inv_values = []
@@ -128,7 +130,10 @@ for i in range(6):
     # Hover metinleri
     net_hover = f"<b>Net Harcanabilir: {net_cash:,.0f} TL</b><br>"
     net_hover += f"<br><b>Gelirler ({income_total:,.0f} TL):</b><br>" + "<br>".join(income_lines) if income_lines else ""
-    net_hover += f"<br><b>Sabit Giderler ({fixed_expenses:,.0f} TL):</b><br>" + "<br>".join(expense_lines) if expense_lines else ""
+
+    exp_hover = f"<b>Sabit Giderler: {fixed_expenses:,.0f} TL</b>"
+    if expense_lines:
+        exp_hover += "<br>" + "<br>".join(expense_lines)
 
     inst_hover = f"<b>Taksit Yükü: {month_load:,.0f} TL</b>"
     if inst_lines:
@@ -140,6 +145,8 @@ for i in range(6):
 
     net_values.append(net_cash)
     net_hovers.append(net_hover)
+    exp_values.append(fixed_expenses)
+    exp_hovers.append(exp_hover)
     inst_values.append(month_load)
     inst_hovers.append(inst_hover)
     inv_values.append(inv_expense)
@@ -148,6 +155,8 @@ for i in range(6):
 fig_bar = go.Figure()
 fig_bar.add_trace(go.Bar(name="Net Harcanabilir", x=labels, y=net_values,
                          marker_color="#2ca02c", hovertext=net_hovers, hoverinfo="text"))
+fig_bar.add_trace(go.Bar(name="Sabit Giderler", x=labels, y=exp_values,
+                         marker_color="#f97316", hovertext=exp_hovers, hoverinfo="text"))
 fig_bar.add_trace(go.Bar(name="Taksit Yükü", x=labels, y=inst_values,
                          marker_color="#d62728", hovertext=inst_hovers, hoverinfo="text"))
 fig_bar.add_trace(go.Bar(name="Yatırım Gideri", x=labels, y=inv_values,
