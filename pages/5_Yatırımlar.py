@@ -1,18 +1,12 @@
 import streamlit as st
 import pandas as pd
-import yfinance as yf
-import requests
-from bs4 import BeautifulSoup
 from datetime import datetime, date
 import calendar
 import uuid
-import urllib3
-import re
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from utils.data_handler import load_data, save_data
 from utils.finance import calc_first_payment_date, clear_form_keys
+from utils.prices import get_current_price, fetch_all_prices, build_portfolio
 
 from utils.auth import check_login
 check_login()
@@ -174,195 +168,37 @@ with st.expander(":material/add: Yeni Alım / Satım İşlemi Ekle", expanded=Fa
 st.divider()
 
 
-# --- 2. CANLI VERİ ÇEKME MOTORLARI ---
-@st.cache_data(ttl=300)
-def get_usd_try():
-    try:
-        return float(yf.Ticker("TRY=X").history(period="5d")['Close'].dropna().iloc[-1])
-    except Exception:
-        return 32.0
+# --- 2. PORTFÖY HESAPLAMA ---
+portfolio = build_portfolio(transactions)
 
-
-@st.cache_data(ttl=300)
-def get_tefas_price(fon_kodu):
-    try:
-        url = f"https://www.tefas.gov.tr/FonAnaliz.aspx?FonKod={fon_kodu}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-            "Connection": "keep-alive"
-        }
-        session = requests.Session()
-        response = session.get(url, headers=headers, timeout=10, verify=False)
-
-        if response.status_code != 200:
-            return -1.0, -1.0
-
-        soup = BeautifulSoup(response.content, "html.parser")
-        page_title = soup.title.text if soup.title else ""
-        if "Just a moment" in page_title or "Attention Required" in page_title:
-            return -1.0, -1.0
-
-        top_list = soup.find("ul", class_="top-list")
-        if top_list:
-            price_str = top_list.find_all("li")[0].find("span").text.strip()
-            price_float = float(price_str.replace('.', '').replace(',', '.'))
-            return price_float, price_float
-        return -1.0, -1.0
-    except Exception:
-        return -1.0, -1.0
-
-
-def clean_and_parse_price(text):
-    text = re.sub(r'[^\d.,]', '', text)
-    if ',' in text and '.' in text:
-        text = text.replace('.', '').replace(',', '.')
-    elif ',' in text:
-        text = text.replace(',', '.')
-    return float(text) if text else 0.0
-
-
-def _oz_to_try(oz_price, usd_try):
-    """Ons fiyatını gram-TL'ye çevirir (1 ons = 31.103 gram)."""
-    return (oz_price / 31.103) * usd_try
-
-
-@st.cache_data(ttl=300)
-def get_gold_silver_price(ticker):
-    if "BANKA" in ticker:
-        try:
-            usd_try = get_usd_try()
-            if "GRAM" in ticker:
-                gold_oz = float(yf.Ticker("GC=F").history(period="5d")['Close'].dropna().iloc[-1])
-                price = _oz_to_try(gold_oz, usd_try)
-                return price, price
-            elif "GUMUS" in ticker:
-                silver_oz = float(yf.Ticker("SI=F").history(period="5d")['Close'].dropna().iloc[-1])
-                price = _oz_to_try(silver_oz, usd_try)
-                return price, price
-        except Exception:
-            pass
-
-    try:
-        url = "https://canlidoviz.com/altin-fiyatlari/kapali-carsi"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7"
-        }
-        session = requests.Session()
-        response = session.get(url, headers=headers, timeout=10, verify=False)
-
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, "html.parser")
-            search_text = ""
-            if "GRAM" in ticker:
-                search_text = "GRAM ALTIN"
-            elif "22" in ticker:
-                search_text = "22 AYAR BİLEZİK"
-            elif "GUMUS" in ticker:
-                search_text = "GÜMÜŞ"
-
-            for tr in soup.find_all('tr'):
-                tds = tr.find_all('td')
-                if len(tds) >= 3:
-                    name_cell = tds[0].text.upper()
-                    if search_text in name_cell:
-                        alis_text = tds[1].text.strip().split()[0] if tds[1].text.strip() else ""
-                        satis_text = tds[2].text.strip().split()[0] if tds[2].text.strip() else ""
-                        return clean_and_parse_price(alis_text), clean_and_parse_price(satis_text)
-    except Exception:
-        pass
-
-    # yfinance fallback
-    try:
-        usd_try = get_usd_try()
-        if "GRAM" in ticker:
-            gold_oz = float(yf.Ticker("GC=F").history(period="5d")['Close'].dropna().iloc[-1])
-            price = _oz_to_try(gold_oz, usd_try)
-            return price, price
-        elif "22" in ticker:
-            gold_oz = float(yf.Ticker("GC=F").history(period="5d")['Close'].dropna().iloc[-1])
-            price = _oz_to_try(gold_oz, usd_try) * 0.916
-            return price, price
-        elif "GUMUS" in ticker:
-            silver_oz = float(yf.Ticker("SI=F").history(period="5d")['Close'].dropna().iloc[-1])
-            price = _oz_to_try(silver_oz, usd_try)
-            return price, price
-    except Exception:
-        return 0.0, 0.0
-    return 0.0, 0.0
-
-
-@st.cache_data(ttl=300)
-def get_current_price(ticker):
-    if ticker.endswith("_FON"):
-        return get_tefas_price(ticker.replace("_FON", ""))
-    if ticker.startswith("API_"):
-        return get_gold_silver_price(ticker)
-    try:
-        stock = yf.Ticker(ticker)
-        hist = stock.history(period="5d")
-        if not hist.empty:
-            price = float(hist['Close'].dropna().iloc[-1])
-            if ticker.endswith("-USD") or not ticker.endswith(".IS"):
-                price = price * get_usd_try()
-            return price, price
-        return 0.0, 0.0
-    except Exception:
-        return 0.0, 0.0
-
-
-# --- 3. PORTFÖY HESAPLAMA ---
-portfolio = {}
-for t in transactions:
-    a_ticker = t["asset"]
-    a_name = t.get("asset_name", a_ticker)
-    qty = float(t["quantity"])
-    price = float(t["price"])
-
-    if a_name not in portfolio:
-        portfolio[a_name] = {"qty": 0.0, "total_cost": 0.0, "ticker": a_ticker}
-
-    if t["type"] == "Alım":
-        portfolio[a_name]["qty"] += qty
-        portfolio[a_name]["total_cost"] += (qty * price)
-    elif t["type"] == "Satım":
-        if portfolio[a_name]["qty"] > 0:
-            avg_cost = portfolio[a_name]["total_cost"] / portfolio[a_name]["qty"]
-            portfolio[a_name]["qty"] -= qty
-            portfolio[a_name]["total_cost"] -= (qty * avg_cost)
-            if portfolio[a_name]["qty"] <= 0.00001:
-                portfolio[a_name]["qty"] = 0.0
-                portfolio[a_name]["total_cost"] = 0.0
+active = {name: data for name, data in portfolio.items() if data["qty"] > 0}
+prices = fetch_all_prices([data["ticker"] for data in active.values()]) if active else {}
 
 active_assets = []
 fon_uyari = False
 
-for a_name, data in portfolio.items():
-    if data["qty"] > 0:
-        avg_cost = data["total_cost"] / data["qty"]
-        alis_fiyati, satis_fiyati = get_current_price(data["ticker"])
+for a_name, data in active.items():
+    avg_cost = data["total_cost"] / data["qty"]
+    alis_fiyati, satis_fiyati = prices[data["ticker"]]
 
-        if alis_fiyati == -1.0:
-            alis_fiyati = satis_fiyati = avg_cost
-            fon_uyari = True
+    if alis_fiyati == -1.0:
+        alis_fiyati = satis_fiyati = avg_cost
+        fon_uyari = True
 
-        current_value = data["qty"] * alis_fiyati
-        profit_loss = current_value - data["total_cost"]
-        profit_loss_pct = (profit_loss / data["total_cost"]) * 100 if data["total_cost"] > 0 else 0
+    current_value = data["qty"] * alis_fiyati
+    profit_loss = current_value - data["total_cost"]
+    profit_loss_pct = (profit_loss / data["total_cost"]) * 100 if data["total_cost"] > 0 else 0
 
-        active_assets.append({
-            "Varlık": a_name,
-            "Adet": round(data["qty"], 5),
-            "Ort. Maliyet (TL)": round(avg_cost, 2),
-            "Güncel Alış (TL)": round(alis_fiyati, 6),
-            "Güncel Satış (TL)": round(satis_fiyati, 6),
-            "Toplam Değer": round(current_value, 2),
-            "Kâr/Zarar (TL)": round(profit_loss, 2),
-            "Kâr/Zarar (%)": round(profit_loss_pct, 2)
-        })
+    active_assets.append({
+        "Varlık": a_name,
+        "Adet": round(data["qty"], 5),
+        "Ort. Maliyet (TL)": round(avg_cost, 2),
+        "Güncel Alış (TL)": round(alis_fiyati, 6),
+        "Güncel Satış (TL)": round(satis_fiyati, 6),
+        "Toplam Değer": round(current_value, 2),
+        "Kâr/Zarar (TL)": round(profit_loss, 2),
+        "Kâr/Zarar (%)": round(profit_loss_pct, 2)
+    })
 
 st.markdown("### :material/account_balance_wallet: Anlık Portföy Durumu")
 
@@ -440,3 +276,13 @@ if transactions:
             st.rerun()
 else:
     st.caption("Henüz bir işlem geçmişi bulunmuyor.")
+
+st.markdown(
+    "<div style='text-align:center; color:rgba(150,150,150,0.45); font-size:0.7rem; margin-top:3rem;'>"
+    "Sanal altın/gümüş: <a href='https://www.yapikredi.com.tr/yatirimci-kosesi/doviz-bilgileri' style='color:inherit'>Yapı Kredi</a> · "
+    "Fiziki altın/gümüş: <a href='https://canlidoviz.com/altin-fiyatlari/kapali-carsi' style='color:inherit'>CanlıDöviz</a> · "
+    "BIST & kripto & döviz: <a href='https://finance.yahoo.com' style='color:inherit'>Yahoo Finance</a> · "
+    "Yatırım fonları: <a href='https://www.tefas.gov.tr' style='color:inherit'>TEFAS</a>"
+    "</div>",
+    unsafe_allow_html=True
+)

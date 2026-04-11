@@ -16,7 +16,69 @@ st.markdown("Düzenli ve düzensiz gelirlerinizi buradan yönetebilirsiniz. Dash
 regular_incomes = load_data(f"regular_income_{current_user}")
 irregular_incomes = load_data(f"irregular_income_{current_user}")
 
-# --- 1. DÜZENLİ GELİRLER ---
+# --- 1. DÜZENSİZ GELİRLER ---
+st.markdown("### :material/payments: Düzensiz / Tek Seferlik Gelirler")
+st.caption("Freelance, ikramiye, hediye gibi tek seferlik gelirleri ekleyin.")
+
+with st.expander(":material/add: Yeni Düzensiz Gelir Ekle", expanded=False):
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        irr_name = st.text_input("Açıklama (Örn: Freelance proje)", key="irr_name")
+    with col2:
+        irr_amount = st.number_input("Tutar (TL)", min_value=0.0, step=500.0, key="irr_amount")
+    with col3:
+        irr_date = st.date_input("Tarih", value=date.today(), key="irr_date")
+
+    if st.button("Düzensiz Geliri Kaydet", type="primary", key="save_irregular"):
+        if irr_name and irr_amount > 0:
+            new_irr = {
+                "id": str(uuid.uuid4())[:8],
+                "name": irr_name.strip(),
+                "amount": irr_amount,
+                "date": irr_date.strftime("%Y-%m-%d")
+            }
+            irregular_incomes.append(new_irr)
+            save_data(f"irregular_income_{current_user}", irregular_incomes)
+            st.success(f"'{irr_name}' başarıyla eklendi!")
+            for key in ["irr_name", "irr_amount"]:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
+        else:
+            st.error("Lütfen açıklama ve tutarı giriniz.")
+
+if irregular_incomes:
+    display_irr = []
+    for inc in irregular_incomes:
+        display_irr.append({
+            "Açıklama": inc["name"],
+            "Tutar (TL)": inc["amount"],
+            "Tarih": inc["date"]
+        })
+
+    df_irr = pd.DataFrame(display_irr).sort_values("Tarih", ascending=False)
+    st.dataframe(df_irr, width="stretch", hide_index=True)
+
+    total_irr = sum(inc["amount"] for inc in irregular_incomes)
+    st.metric("Toplam Düzensiz Gelir", f"{total_irr:,.0f} TL")
+
+    # Silme
+    with st.expander(":material/delete: Düzensiz Gelir Sil"):
+        options_irr = {inc["id"]: f"{inc['date']} - {inc['name']} ({inc['amount']:,.0f} TL)" for inc in irregular_incomes}
+        selected_irr_id = st.selectbox("Silinecek geliri seçin:", options=list(options_irr.keys()),
+                                       format_func=lambda x: options_irr[x], key="del_irregular")
+        if st.button("Seçili Geliri Sil", type="primary", key="btn_del_irregular"):
+            irregular_incomes = [inc for inc in irregular_incomes if inc["id"] != selected_irr_id]
+            save_data(f"irregular_income_{current_user}", irregular_incomes)
+            st.success("Gelir kaydı silindi.")
+            st.rerun()
+else:
+    st.info("Henüz düzensiz gelir eklenmemiş.")
+
+st.divider()
+
+# --- 2. DÜZENLİ GELİRLER ---
 st.markdown("### :material/event_repeat: Düzenli Gelirler")
 st.caption("Maaş, kira geliri, düzenli yan gelir gibi tekrarlayan gelirleri ekleyin.")
 
@@ -106,65 +168,3 @@ if regular_incomes:
             st.rerun()
 else:
     st.info("Henüz düzenli gelir eklenmemiş. Yukarıdan ekleyebilirsiniz.")
-
-st.divider()
-
-# --- 2. DÜZENSİZ GELİRLER ---
-st.markdown("### :material/payments: Düzensiz / Tek Seferlik Gelirler")
-st.caption("Freelance, ikramiye, hediye gibi tek seferlik gelirleri ekleyin.")
-
-with st.expander(":material/add: Yeni Düzensiz Gelir Ekle", expanded=False):
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        irr_name = st.text_input("Açıklama (Örn: Freelance proje)", key="irr_name")
-    with col2:
-        irr_amount = st.number_input("Tutar (TL)", min_value=0.0, step=500.0, key="irr_amount")
-    with col3:
-        irr_date = st.date_input("Tarih", value=date.today(), key="irr_date")
-
-    if st.button("Düzensiz Geliri Kaydet", type="primary", key="save_irregular"):
-        if irr_name and irr_amount > 0:
-            new_irr = {
-                "id": str(uuid.uuid4())[:8],
-                "name": irr_name.strip(),
-                "amount": irr_amount,
-                "date": irr_date.strftime("%Y-%m-%d")
-            }
-            irregular_incomes.append(new_irr)
-            save_data(f"irregular_income_{current_user}", irregular_incomes)
-            st.success(f"'{irr_name}' başarıyla eklendi!")
-            for key in ["irr_name", "irr_amount"]:
-                if key in st.session_state:
-                    del st.session_state[key]
-            st.rerun()
-        else:
-            st.error("Lütfen açıklama ve tutarı giriniz.")
-
-if irregular_incomes:
-    display_irr = []
-    for inc in irregular_incomes:
-        display_irr.append({
-            "Açıklama": inc["name"],
-            "Tutar (TL)": inc["amount"],
-            "Tarih": inc["date"]
-        })
-
-    df_irr = pd.DataFrame(display_irr).sort_values("Tarih", ascending=False)
-    st.dataframe(df_irr, width="stretch", hide_index=True)
-
-    total_irr = sum(inc["amount"] for inc in irregular_incomes)
-    st.metric("Toplam Düzensiz Gelir", f"{total_irr:,.0f} TL")
-
-    # Silme
-    with st.expander(":material/delete: Düzensiz Gelir Sil"):
-        options_irr = {inc["id"]: f"{inc['date']} - {inc['name']} ({inc['amount']:,.0f} TL)" for inc in irregular_incomes}
-        selected_irr_id = st.selectbox("Silinecek geliri seçin:", options=list(options_irr.keys()),
-                                       format_func=lambda x: options_irr[x], key="del_irregular")
-        if st.button("Seçili Geliri Sil", type="primary", key="btn_del_irregular"):
-            irregular_incomes = [inc for inc in irregular_incomes if inc["id"] != selected_irr_id]
-            save_data(f"irregular_income_{current_user}", irregular_incomes)
-            st.success("Gelir kaydı silindi.")
-            st.rerun()
-else:
-    st.info("Henüz düzensiz gelir eklenmemiş.")

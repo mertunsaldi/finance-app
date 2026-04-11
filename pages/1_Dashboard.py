@@ -10,6 +10,7 @@ from utils.finance import (
     is_income_applicable, is_installment_active, resolve_day,
     MONTH_NAMES_SHORT, MONTH_NAMES_FULL
 )
+from utils.prices import calculate_portfolio_totals
 
 from utils.auth import check_login
 check_login()
@@ -28,31 +29,33 @@ expenses = load_data(f"expenses_{current_user}")
 fixed_expenses = sum(exp["amount"] for exp in expenses)
 
 # --- HIZLI ÖZET KARTLARI ---
+now = datetime.now()
+
 total_active_debt = sum(item["total_remaining"] for item in installments)
 current_month_load = 0
-
-now = datetime.now()
 for inst in installments:
     if is_installment_active(inst, now.year, now.month):
         current_month_load += inst["monthly_payment"]
 
-total_investment_cost = 0
-for t in investments:
-    if t["type"] == "Alım":
-        total_investment_cost += float(t["total"])
-    elif t["type"] == "Satım":
-        total_investment_cost -= float(t["total"])
-if total_investment_cost < 0:
-    total_investment_cost = 0
-
 monthly_income = get_monthly_income(now.year, now.month, regular_incomes, irregular_incomes)
 monthly_inv_expense = get_monthly_investment_expense(now.year, now.month, investments)
 
-col1, col2, col3 = st.columns(3)
-col1.metric("Toplam Yatırım (Maliyet)", f"{total_investment_cost:,.0f} TL")
-col2.metric("Kalan Toplam Taksit Borcu", f"{total_active_debt:,.0f} TL")
-col3.metric("Bu Ayki Taksit Yükü", f"{current_month_load:,.0f} TL",
+total_portfolio_cost, total_current_value = calculate_portfolio_totals(investments)
+total_pl = total_current_value - total_portfolio_cost
+total_pl_pct = (total_pl / total_portfolio_cost) * 100 if total_portfolio_cost > 0 else 0
+
+# Üst satır: Taksitler
+col1, col2 = st.columns(2)
+col1.metric("Kalan Toplam Taksit Borcu", f"{total_active_debt:,.0f} TL")
+col2.metric("Bu Ayki Taksit Yükü", f"{current_month_load:,.0f} TL",
             delta=f"Net Kalan: {(monthly_income - fixed_expenses - current_month_load - monthly_inv_expense):,.0f} TL",
+            delta_color="normal")
+
+# Alt satır: Yatırımlar
+col3, col4 = st.columns(2)
+col3.metric("Toplam Yatırım (Maliyet)", f"{total_portfolio_cost:,.0f} TL")
+col4.metric("Anlık Portföy Değeri", f"{total_current_value:,.0f} TL",
+            delta=f"{total_pl:,.0f} TL ({total_pl_pct:,.1f}%)",
             delta_color="normal")
 
 st.divider()
