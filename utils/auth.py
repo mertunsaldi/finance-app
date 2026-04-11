@@ -23,20 +23,12 @@ def check_login(cookie_manager=None):
     if current_user:
         return current_user
 
-    # 2) Cookie'den oku (CookieManager gerekli)
-    if cookie_manager is not None:
-        cookies = cookie_manager.get_all()
-        cookie_user = cookies.get("current_user") if cookies else None
-
-        if cookie_user:
-            st.session_state["logged_in_user"] = cookie_user
-            return cookie_user
-
-        # CookieManager ilk renderda boş döner (bileşen henüz yüklenmedi).
-        # Bir kez sessiz rerun yap — ikinci renderda gerçek cookie'ler gelir.
-        if "_cookies_checked" not in st.session_state:
-            st.session_state["_cookies_checked"] = True
-            st.stop()
+    # 2) Cookie'den oku — st.context.cookies HTTP header'dan okur,
+    #    ilk renderda anında gelir, CookieManager beklemeye gerek yok.
+    cookie_user = st.context.cookies.get("current_user")
+    if cookie_user:
+        st.session_state["logged_in_user"] = cookie_user
+        return cookie_user
 
     # 3) cookie_manager yoksa (sayfa doğrudan çalıştı) — login'e yönlendir
     if cookie_manager is None:
