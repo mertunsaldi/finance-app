@@ -32,6 +32,12 @@ def check_login(cookie_manager=None):
             st.session_state["logged_in_user"] = cookie_user
             return cookie_user
 
+        # CookieManager ilk renderda boş döner (bileşen henüz yüklenmedi).
+        # Bir kez sessiz rerun yap — ikinci renderda gerçek cookie'ler gelir.
+        if "_cookies_checked" not in st.session_state:
+            st.session_state["_cookies_checked"] = True
+            st.stop()
+
     # 3) cookie_manager yoksa (sayfa doğrudan çalıştı) — login'e yönlendir
     if cookie_manager is None:
         st.warning("Oturum bulunamadı. Lütfen ana sayfadan giriş yapın.")
