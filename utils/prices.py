@@ -20,15 +20,45 @@ def get_usd_try():
         return 32.0
 
 
-_TEFAS_HEADERS = {
-    "Connection": "keep-alive",
-    "X-Requested-With": "XMLHttpRequest",
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-    "Accept": "application/json, text/javascript, */*; q=0.01",
-    "Origin": "https://fundturkey.com.tr",
-    "Referer": "https://fundturkey.com.tr/TarihselVeriler.aspx",
-}
+_TEFAS_ENDPOINTS = [
+    {
+        "url": "https://fundturkey.com.tr/api/DB/BindHistoryInfo",
+        "headers": {
+            "Connection": "keep-alive",
+            "X-Requested-With": "XMLHttpRequest",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Origin": "https://fundturkey.com.tr",
+            "Referer": "https://fundturkey.com.tr/TarihselVeriler.aspx",
+        },
+    },
+    {
+        "url": "https://www.tefas.gov.tr/api/DB/BindHistoryInfo",
+        "headers": {
+            "Connection": "keep-alive",
+            "X-Requested-With": "XMLHttpRequest",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Origin": "https://www.tefas.gov.tr",
+            "Referer": "https://www.tefas.gov.tr/TarihselVeriler.aspx",
+        },
+    },
+]
+
+
+def _tefas_post(data):
+    """fundturkey.com.tr'yi önce dener, başarısız olursa tefas.gov.tr'ye geçer."""
+    for ep in _TEFAS_ENDPOINTS:
+        try:
+            r = requests.post(ep["url"], headers=ep["headers"], timeout=10, verify=False, data=data)
+            result = r.json()
+            if result.get("data") is not None:
+                return result
+        except Exception:
+            pass
+    return {}
 
 
 def _tefas_latest_date():
@@ -40,16 +70,9 @@ def _tefas_latest_date():
     # Bugün henüz veri yoksa bir önceki iş gününe düş
     for _ in range(3):
         date_str = d.strftime("%d.%m.%Y")
-        try:
-            r = requests.post(
-                "https://fundturkey.com.tr/api/DB/BindHistoryInfo",
-                headers=_TEFAS_HEADERS, timeout=10, verify=False,
-                data={"fontip": "YAT", "bastarih": date_str, "bittarih": date_str, "fonkod": "MAC"},
-            )
-            if r.json().get("data"):
-                return date_str
-        except Exception:
-            pass
+        result = _tefas_post({"fontip": "YAT", "bastarih": date_str, "bittarih": date_str, "fonkod": "MAC"})
+        if result.get("data"):
+            return date_str
         d -= timedelta(days=1)
         if d.weekday() >= 5:
             d -= timedelta(days=(d.weekday() - 4))
@@ -64,20 +87,13 @@ def _get_tefas_date():
 
 @st.cache_data(ttl=300)
 def get_tefas_price(fon_kodu):
-    """Tek bir fonun fiyatını fundturkey.com.tr API'sinden çeker (~0.1 sn)."""
+    """Tek bir fonun fiyatını çeker; fundturkey.com.tr önce, fallback tefas.gov.tr."""
     date_str = _get_tefas_date()
-    try:
-        r = requests.post(
-            "https://fundturkey.com.tr/api/DB/BindHistoryInfo",
-            headers=_TEFAS_HEADERS, timeout=10, verify=False,
-            data={"fontip": "YAT", "bastarih": date_str, "bittarih": date_str, "fonkod": fon_kodu},
-        )
-        records = r.json().get("data", [])
-        if records:
-            price = records[0]["FIYAT"]
-            return price, price
-    except Exception:
-        pass
+    result = _tefas_post({"fontip": "YAT", "bastarih": date_str, "bittarih": date_str, "fonkod": fon_kodu})
+    records = result.get("data", [])
+    if records:
+        price = records[0]["FIYAT"]
+        return price, price
     return -1.0, -1.0
 
 
