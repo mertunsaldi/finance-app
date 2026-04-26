@@ -18,14 +18,15 @@ show_sidebar_user(cookie_manager)
 
 # Tüm kullanıcı verisini paralel preload
 current_user = st.session_state["logged_in_user"]
-preload_data([
-    f"installments_{current_user}",
-    f"investments_{current_user}",
-    f"regular_income_{current_user}",
-    f"irregular_income_{current_user}",
-    f"expenses_{current_user}",
-    f"cards_{current_user}",
-])
+with st.spinner("Veriler yükleniyor..."):
+    preload_data([
+        f"installments_{current_user}",
+        f"investments_{current_user}",
+        f"regular_income_{current_user}",
+        f"irregular_income_{current_user}",
+        f"expenses_{current_user}",
+        f"cards_{current_user}",
+    ])
 
 pages = st.navigation([
     st.Page("pages/1_Dashboard.py", title="Ana Sayfa", icon=":material/home:"),

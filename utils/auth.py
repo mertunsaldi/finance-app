@@ -75,8 +75,10 @@ def check_login(cookie_manager=None):
 
                 if user_found:
                     st.session_state["logged_in_user"] = login_username
+                    st.session_state.pop("_cookie_retries", None)
                     cookie_manager.set("current_user", login_username, max_age=30 * 24 * 60 * 60)
-                    time.sleep(0.5)
+                    st.success("Giriş başarılı! Yükleniyor...")
+                    time.sleep(1.5)
                     st.rerun()
                 else:
                     st.error("Hatalı kullanıcı adı veya şifre!")
